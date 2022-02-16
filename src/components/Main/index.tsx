@@ -184,11 +184,13 @@ const Main = () => {
   }
   // pesquisa e adicionar videos
   // retornar dados para tela inicial e funcionalidades
-  useEffect(() => {
-    getVideosApi()
-  }, [])
+  // useEffect(() => {
+  //   ;(async () => {
+  //     await getVideosFirebase()
+  //   })()
+  // }, [])
 
-  const getVideosApi = async () => {
+  const getVideosFirebase = async () => {
     // setLoading(true)
 
     await FirebaseApi.db
@@ -200,64 +202,58 @@ const Main = () => {
         data.forEach((doc) => {
           videosId.push(doc.data().videoId)
         })
-        setVideosReturnApi(videosId)
-
-        // const storageVideos = localStorage.getItem('videos')
-        // const dataVideosStorage = JSON.parse(storageVideos)
-        // console.log('video storage', JSON.parse(storageVideos))
-        // eslint-disable-next-line prefer-const
-        // let videosStorage: string[] = []
-        // dataVideosStorage.forEach((x: any) => videosStorage.push(x.id))
+        //====================
+        const dataVideosStorage = JSON.parse(
+          localStorage.getItem('videos') || '{}',
+        )
+        // console.log('Videos salvos no storage', dataVideosStorage)
+        //eslint-disable-next-line prefer-const
+        let videosStorage: string[] = []
+        dataVideosStorage.forEach((doc: { id: string }) =>
+          videosStorage.push(doc.id),
+        )
         // console.log('videosId', videosId)
         // console.log('videosStorage', videosStorage)
 
-        // videosId = videosId.filter(
-        //   (item, index) => item !== videosStorage[index],
-        // )
+        videosId = videosId.filter(
+          (item, index) => item !== videosStorage[index],
+        )
         // console.log('DEPOIS DO FILTER', videosId)
 
-        // videosId = videosId.filter(
-        //   (data) =>
-        //     data !== dataVideosStorage.forEach((x: string) => videosId.push(x)),
-        // )
-
-        // for (let i = 0; i < videosId.length; i++) {
-        //   // if (videosStorage.indexOf(videosId[i]) > -1) {
-        //   //   videosId.push(videosId[i])
-        //   // }
-        //   console.log(videosStorage.indexOf(videosId))
-
-        //   // if ( > -1) {
-        //   //   videosId.push(videosId[i])
-        //   // }
-        //   return
-        // }
-
-        // console.log('aaaaa', videosId)
-
-        // const opts: youtubeSearch.YouTubeSearchOptions = {
-        //   maxResults: videosReturnApi.length,
-        //   key: envCustom.KEY_API_YOUTUBE,
-        // }
-        // // eslint-disable-next-line prefer-const
-        // let resultTest = []
-        // videosReturnApi.forEach(async (doc) => {
-        //   await youtubeSearch(doc, opts, (err, results) => {
-        //     if (err) {
-        //       console.log(err)
-        //       setLoading(false)
-        //       return
-        //     }
-        //     localStorage.setItem('videos', JSON.stringify(results))
-        //     console.dir('videos', results)
-        //     resultTest.push(results)
-        //   })
-        //   setLoading(false)
-        // })
+        videosId = videosId.filter(
+          (data) =>
+            data !== dataVideosStorage.forEach((x: string) => videosId.push(x)),
+        )
+        // console.log('VideosId depois do filter', videosId)
+        setVideosReturnApi(videosId)
+        if (videosReturnApi) {
+          getVideosApi()
+        }
       })
       .catch((err) => {
         // console.log('deu errado', err)
       })
+  }
+  const getVideosApi = async () => {
+    const opts: youtubeSearch.YouTubeSearchOptions = {
+      maxResults: videosReturnApi.length,
+      key: envCustom.KEY_API_YOUTUBE,
+    }
+    // eslint-disable-next-line prefer-const
+    let resultTest = []
+    videosReturnApi.forEach(async (doc) => {
+      await youtubeSearch(doc, opts, (err, results) => {
+        if (err) {
+          console.log(err)
+          setLoading(false)
+          return
+        }
+        localStorage.setItem('videos', JSON.stringify(results))
+        resultTest.push(results)
+        // console.log('===== CONSULTA VIDEO API OK =====')
+      })
+      setLoading(false)
+    })
   }
   // retornar dados para tela inicial e funcionalidades
   return (

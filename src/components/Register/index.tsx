@@ -94,7 +94,7 @@ const Register = () => {
             <C.Input
               type="password"
               name="senha"
-              placeholder="Senha 6 digitos"
+              placeholder="Senha"
               value={senha}
               onChange={(e) => setSenha(e.target.value)}
             />
