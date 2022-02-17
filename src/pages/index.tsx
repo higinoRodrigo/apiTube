@@ -1,5 +1,7 @@
 import Main from 'components/Main'
 
-export default function Index() {
+const Index = () => {
   return <Main />
 }
+
+export default Index

@@ -3,6 +3,11 @@ import Head from 'next/head'
 
 import GlobalStyles from 'styles/global'
 
+import { Provider } from 'react-redux'
+import configStore from '../store/storeConfig'
+
+const store = configStore()
+
 const App = ({ Component, pageProps }: AppProps) => {
   return (
     <>
@@ -14,7 +19,9 @@ const App = ({ Component, pageProps }: AppProps) => {
         <meta name="description" content="Job challenger" />
       </Head>
       <GlobalStyles />
-      <Component {...pageProps} />
+      <Provider store={store}>
+        <Component {...pageProps} />
+      </Provider>
     </>
   )
 }
