@@ -286,6 +286,10 @@ export const RegisterBy = styled.div`
   display: flex;
   justify-content: space-between;
   padding: 0 5px;
+  @media (max-width: 550px) {
+    flex-direction: column-reverse;
+    align-items: flex-start;
+  }
 `
 export const TextRegisterBy = styled.span`
   margin-right: 10px;
@@ -302,6 +306,11 @@ export const Video = styled.img`
   background: #ccc;
   border-radius: 10px;
   object-fit: cover;
+  transition: filter 0.2s ease-in;
+
+  &:hover {
+    filter: brightness(0.8);
+  }
 
   @media (max-width: 550px) {
     width: 256px;

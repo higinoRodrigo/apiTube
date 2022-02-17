@@ -18,18 +18,23 @@ import { FormEvent, useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
 import GifLoading from 'components/GifLoading'
 import { route } from 'next/dist/server/router'
+import NotFound from 'components/NotFound'
 
 interface DataSearchProps {
   id: string
-  title: string
-  titleChannel: string
-  link: string
-  thumbnails: string | undefined
+  author: string
+  videoTitle: string
+  thumbnailUrl: string | undefined
+  linkUrl: string
 }
 interface VideosAddsProps {
   videoId: string
-  name: string
+  addedBy: string
   uid: string | null
+  author: string
+  videoTitle: string
+  thumbnailUrl: string | undefined
+  linkUrl: string
   likes: string[]
   dislikes: string[]
 }
@@ -48,8 +53,9 @@ const Main = () => {
   const [videoPendentSend, setVideoPendentSend] = useState<boolean>(false)
   const [videosAdds, setVideosAdds] = useState<VideosAddsProps[]>([])
   // consulta de videos e funcionalidades da tela inicial
-  const [videosReturnApi, setVideosReturnApi] = useState<string[]>([])
+  const [videosReturnApi, setVideosReturnApi] = useState<VideosAddsProps[]>([])
   const [videosPublicos, setVideosPublicos] = useState([])
+  // console.log('VIDEO RETURN API', videosReturnApi)
 
   useEffect(() => {
     if (!dataSearch || !searchText) {
@@ -107,12 +113,12 @@ const Main = () => {
     const opts: youtubeSearch.YouTubeSearchOptions = {
       maxResults: 6,
       key: envCustom.KEY_API_YOUTUBE,
+      type: 'video',
     }
 
     youtubeSearch(query, opts, (err, results) => {
       setLoading(true)
       if (err) {
-        // console.log(err)
         setDataSearch([])
         setLoading(false)
         return
@@ -122,10 +128,10 @@ const Main = () => {
       results?.forEach((doc) => {
         data.push({
           id: doc.id,
-          title: doc.title,
-          link: doc.link,
-          titleChannel: doc.channelTitle,
-          thumbnails: doc.thumbnails.high?.url
+          author: doc.channelTitle,
+          videoTitle: doc.title,
+          linkUrl: doc.link,
+          thumbnailUrl: doc.thumbnails.high?.url
             ? doc.thumbnails.high?.url
             : doc.thumbnails.default?.url,
         })
@@ -135,22 +141,28 @@ const Main = () => {
       setLoading(false)
     })
   }
-  const handleAddVideo = (id: string) => {
+  const handleAddVideo = (props: DataSearchProps) => {
     if (isLogged) {
       setErrorIslogged(false)
-      let duplicated
-      videosAdds?.forEach((doc) => {
-        if (doc.videoId === id) {
-          duplicated = 'true'
-          return
+      const alreadyExists = videosAdds.findIndex(
+        (video) => video.videoId === props.id,
+      )
+      if (alreadyExists !== -1) {
+        videosAdds.splice(alreadyExists, 1)
+        setVideosAdds([...videosAdds])
+        if (videosAdds.length === 0) {
+          setVideoPendentSend(false)
         }
-      })
-      if (duplicated === 'true') {
         return
       }
+
       const data: VideosAddsProps = {
-        videoId: id,
-        name: displayName ? displayName : 'Unknown',
+        videoId: props.id,
+        author: props.author,
+        videoTitle: props.videoTitle,
+        thumbnailUrl: props.thumbnailUrl,
+        linkUrl: props.linkUrl,
+        addedBy: displayName ? displayName : 'Unknown',
         uid: UUID,
         likes: [],
         dislikes: [],
@@ -170,92 +182,45 @@ const Main = () => {
     setLoading(true)
     setVideoPendentSend(false)
     if (videosAdds.length === 0) {
+      setLoading(false)
       return
     }
-    videosAdds.forEach((doc) => {
-      const docRef = FirebaseApi.db.collection('videos').doc(doc.videoId)
-      FirebaseApi.batch.set(docRef, doc)
-    })
-    await FirebaseApi.batch.commit()
-    // setVideosAdds([])
-    // setIsSearch(false)
-    // setSearchText('')
-    router.reload()
+
+    for (let i = 0; i < videosAdds.length; i++) {
+      const video = videosAdds[i]
+      await FirebaseApi.firebaseApp
+        .firestore()
+        .collection('videos')
+        .doc(video.videoId)
+        .set(video)
+    }
+    getVideosFirebase()
+    setVideosAdds([])
+    setIsSearch(false)
+    setSearchText('')
+    setLoading(false)
+    // router.reload()
   }
-  // pesquisa e adicionar videos
-  // retornar dados para tela inicial e funcionalidades
-  // useEffect(() => {
-  //   ;(async () => {
-  //     await getVideosFirebase()
-  //   })()
-  // }, [])
+  // retornar dados para tela inicial
+  useEffect(() => {
+    ;(async () => {
+      await getVideosFirebase()
+    })()
+  }, [])
 
   const getVideosFirebase = async () => {
-    // setLoading(true)
+    setLoading(true)
 
-    await FirebaseApi.db
-      .collection('videos')
-      .get()
-      .then((data) => {
-        // eslint-disable-next-line prefer-const
-        let videosId: string[] = []
-        data.forEach((doc) => {
-          videosId.push(doc.data().videoId)
-        })
-        //====================
-        const dataVideosStorage = JSON.parse(
-          localStorage.getItem('videos') || '{}',
-        )
-        // console.log('Videos salvos no storage', dataVideosStorage)
-        //eslint-disable-next-line prefer-const
-        let videosStorage: string[] = []
-        dataVideosStorage.forEach((doc: { id: string }) =>
-          videosStorage.push(doc.id),
-        )
-        // console.log('videosId', videosId)
-        // console.log('videosStorage', videosStorage)
-
-        videosId = videosId.filter(
-          (item, index) => item !== videosStorage[index],
-        )
-        // console.log('DEPOIS DO FILTER', videosId)
-
-        videosId = videosId.filter(
-          (data) =>
-            data !== dataVideosStorage.forEach((x: string) => videosId.push(x)),
-        )
-        // console.log('VideosId depois do filter', videosId)
-        setVideosReturnApi(videosId)
-        if (videosReturnApi) {
-          getVideosApi()
-        }
-      })
-      .catch((err) => {
-        // console.log('deu errado', err)
-      })
-  }
-  const getVideosApi = async () => {
-    const opts: youtubeSearch.YouTubeSearchOptions = {
-      maxResults: videosReturnApi.length,
-      key: envCustom.KEY_API_YOUTUBE,
-    }
-    // eslint-disable-next-line prefer-const
-    let resultTest = []
-    videosReturnApi.forEach(async (doc) => {
-      await youtubeSearch(doc, opts, (err, results) => {
-        if (err) {
-          console.log(err)
-          setLoading(false)
-          return
-        }
-        localStorage.setItem('videos', JSON.stringify(results))
-        resultTest.push(results)
-        // console.log('===== CONSULTA VIDEO API OK =====')
-      })
-      setLoading(false)
+    const data = await FirebaseApi.db.collection('videos').get()
+    const videos: VideosAddsProps[] = []
+    data.forEach((doc) => {
+      const video = doc.data() as VideosAddsProps
+      videos.push(video)
     })
+    setVideosReturnApi(videos)
+    setLoading(false)
   }
-  // retornar dados para tela inicial e funcionalidades
+
   return (
     <C.Wrapper>
       <C.Header>
@@ -309,50 +274,73 @@ const Main = () => {
         {loading ? (
           <GifLoading />
         ) : isSearch ? (
-          dataSearch.map((data) => {
+          dataSearch.length ? (
+            dataSearch.map((data) => {
+              return (
+                <C.BoxVideoAdd key={data.id}>
+                  <C.Video src={data.thumbnailUrl} />
+                  <C.ContainerInfos>
+                    <C.ContainerTitleViews>
+                      <C.Title title={data.videoTitle}>
+                        {data.videoTitle}
+                      </C.Title>
+                    </C.ContainerTitleViews>
+                    <C.ContainerAdd onClick={() => handleAddVideo(data)}>
+                      <C.TextAdd>
+                        {videosAdds.find((video) => video.videoId === data.id)
+                          ? 'Remover'
+                          : 'Adicionar'}
+                      </C.TextAdd>
+                      <C.AddAndRemove>
+                        <MdLibraryAddCheck size={22} color="#fff" />
+                      </C.AddAndRemove>
+                    </C.ContainerAdd>
+                  </C.ContainerInfos>
+                </C.BoxVideoAdd>
+              )
+            })
+          ) : (
+            <NotFound />
+          )
+        ) : videosReturnApi.length ? (
+          videosReturnApi.map((data) => {
             return (
-              <C.BoxVideoAdd key={data.id}>
-                <C.Video src={data.thumbnails} />
-                <C.ContainerInfos>
-                  <C.ContainerTitleViews>
-                    <C.Title title={data.title}>{data.title}</C.Title>
-                  </C.ContainerTitleViews>
-                  <C.ContainerAdd onClick={() => handleAddVideo(data.id)}>
-                    <C.TextAdd>Adicione</C.TextAdd>
-                    <C.AddAndRemove>
-                      <MdLibraryAddCheck size={22} color="#fff" />
-                    </C.AddAndRemove>
-                  </C.ContainerAdd>
-                </C.ContainerInfos>
-              </C.BoxVideoAdd>
+              <>
+                <C.BoxVideo key={data.videoId}>
+                  <C.RegisterBy>
+                    <C.TextRegisterBy>
+                      Adicionado por: {data.addedBy}
+                    </C.TextRegisterBy>
+                    <C.Autor>Fonte: {data.author}</C.Autor>
+                  </C.RegisterBy>
+                  <a href={data.linkUrl} target="_blank" rel="noreferrer">
+                    <C.Video
+                      src={data.thumbnailUrl}
+                      style={{ cursor: 'pointer' }}
+                    />
+                  </a>
+                  <C.ContainerInfos>
+                    <C.ContainerTitleViews>
+                      <C.Title title={data.videoTitle}>
+                        {data.videoTitle}
+                      </C.Title>
+                    </C.ContainerTitleViews>
+                    <C.ContainerLikes>
+                      <C.CountLikes>{data.likes.length}</C.CountLikes>
+                      <C.Like>
+                        <AiFillLike size={35} color="#2EB086" />
+                      </C.Like>
+                      <C.Dislike>
+                        <AiOutlineDislike size={35} color="#fff" />
+                      </C.Dislike>
+                    </C.ContainerLikes>
+                  </C.ContainerInfos>
+                </C.BoxVideo>
+              </>
             )
           })
         ) : (
-          <C.BoxVideo>
-            <C.RegisterBy>
-              <C.TextRegisterBy>
-                Adicionado por: Rodrigo Higino
-              </C.TextRegisterBy>
-              <C.Autor>Fonte: zHunter2390</C.Autor>
-            </C.RegisterBy>
-            <C.Video />
-            <C.ContainerInfos>
-              <C.ContainerTitleViews>
-                <C.Title title="Youtube API com redux typescript e nextjs">
-                  Youtube API com redux typescript e nextjs
-                </C.Title>
-              </C.ContainerTitleViews>
-              <C.ContainerLikes>
-                <C.CountLikes>1234</C.CountLikes>
-                <C.Like>
-                  <AiFillLike size={35} color="#2EB086" />
-                </C.Like>
-                <C.Dislike>
-                  <AiOutlineDislike size={35} color="#fff" />
-                </C.Dislike>
-              </C.ContainerLikes>
-            </C.ContainerInfos>
-          </C.BoxVideo>
+          <NotFound />
         )}
       </C.ContainerBoxs>
 
