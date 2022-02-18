@@ -81,9 +81,11 @@ const Main = () => {
       if (errorIslogged) {
         setTimeout(() => {
           setErrorIslogged(false)
-        }, 4000)
+          router.push('/entrar')
+        }, 3500)
       }
     })()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [errorIslogged])
 
   const logout = () => {
@@ -223,7 +225,10 @@ const Main = () => {
     uid: string,
     action: string,
   ) => {
-    if (!isLogged) return
+    if (!isLogged) {
+      router.push('/entrar')
+      return
+    }
     const video = videosReturnApi.find((video) => video.videoId === videoId)
     if (!video) {
       return
