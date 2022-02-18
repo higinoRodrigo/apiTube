@@ -4,9 +4,7 @@ import Head from 'next/head'
 import GlobalStyles from 'styles/global'
 
 import { Provider } from 'react-redux'
-import configStore from '../store/storeConfig'
-
-const store = configStore()
+import store from '../store'
 
 const App = ({ Component, pageProps }: AppProps) => {
   return (

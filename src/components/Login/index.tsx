@@ -14,8 +14,6 @@ const Login = () => {
   const [error, setError] = useState<boolean>(false)
   const [loading, setLoading] = useState<boolean>(false)
 
-  const [isActive, setIsActive] = useState(false)
-
   const signinGoogle = async () => {
     const result = FirebaseApi.googleSignin()
 

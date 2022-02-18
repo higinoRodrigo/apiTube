@@ -1,7 +1,7 @@
 import NotFound from 'components/NotFound'
 
 const NotFound404 = () => {
-  return <NotFound />
+  return <NotFound notfound />
 }
 
 export default NotFound404

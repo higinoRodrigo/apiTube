@@ -1,6 +1,8 @@
+import { FormEvent, useEffect, useState } from 'react'
 import * as C from './styles'
-import Link from 'next/link'
 import youtubeSearch from 'youtube-search'
+import { useRouter } from 'next/router'
+import FirebaseApi from '../../FirebaseApi'
 import envCustom from '../../../.envCustom'
 import {
   AiFillDislike,
@@ -11,14 +13,11 @@ import {
 } from 'react-icons/ai'
 import { MdOutlineDownloading } from 'react-icons/md'
 import { MdLibraryAddCheck } from 'react-icons/md'
-import { BiUserCircle } from 'react-icons/bi'
 import { FaSignOutAlt } from 'react-icons/Fa'
-import FirebaseApi from '../../FirebaseApi'
-import { FormEvent, useEffect, useState } from 'react'
-import { useRouter } from 'next/router'
 import GifLoading from 'components/GifLoading'
-import { route } from 'next/dist/server/router'
 import NotFound from 'components/NotFound'
+import { useDispatch } from 'react-redux'
+import { signout } from 'store/actions/signoutActions'
 
 interface DataSearchProps {
   id: string
@@ -39,8 +38,8 @@ interface VideosAddsProps {
   dislikes: string[]
 }
 const Main = () => {
+  const dispatch = useDispatch()
   const router = useRouter()
-
   const [isLogged, setIsLogged] = useState<boolean>(false)
   const [imgPerfil, setImgPerfil] = useState<string | null>('')
   const [displayName, setDisplayName] = useState<string | null>('')
@@ -54,8 +53,6 @@ const Main = () => {
   const [videosAdds, setVideosAdds] = useState<VideosAddsProps[]>([])
   // consulta de videos e funcionalidades da tela inicial
   const [videosReturnApi, setVideosReturnApi] = useState<VideosAddsProps[]>([])
-  const [videosPublicos, setVideosPublicos] = useState([])
-  // console.log('VIDEO RETURN API', videosReturnApi)
 
   useEffect(() => {
     if (!dataSearch || !searchText) {
@@ -69,7 +66,6 @@ const Main = () => {
     ;(async () => {
       FirebaseApi.firebaseApp.auth().onAuthStateChanged((user) => {
         if (user) {
-          // console.log(user)
           setImgPerfil(user.photoURL)
           setDisplayName(user.displayName)
           setUUID(user.uid)
@@ -90,8 +86,8 @@ const Main = () => {
     })()
   }, [errorIslogged])
 
-  const logout = async () => {
-    await FirebaseApi.firebaseApp.auth().signOut()
+  const logout = () => {
+    dispatch(signout())
     setImgPerfil('')
     setDisplayName('')
     setUUID('')
@@ -217,8 +213,81 @@ const Main = () => {
       const video = doc.data() as VideosAddsProps
       videos.push(video)
     })
-    setVideosReturnApi(videos)
+    const videosOrdered = videos.sort((a, b) => b.likes.length - a.likes.length)
+    setVideosReturnApi(videosOrdered)
     setLoading(false)
+  }
+
+  const handleLikeAndDislike = async (
+    videoId: string,
+    uid: string,
+    action: string,
+  ) => {
+    if (!isLogged) return
+    const video = videosReturnApi.find((video) => video.videoId === videoId)
+    if (!video) {
+      return
+    }
+
+    const index = videosReturnApi.findIndex(
+      (video) => video.videoId === videoId,
+    )
+    const likes = video.likes
+    const dislikes = video.dislikes
+    const alreadyLiked = likes.find((like) => like === uid)
+    const alreadyDisliked = dislikes.find((dislike) => dislike === uid)
+
+    if (alreadyLiked) {
+      likes.splice(likes.indexOf(uid), 1)
+      if (action === 'dislike') {
+        dislikes.push(uid)
+      }
+      await FirebaseApi.db.collection('videos').doc(videoId).update({
+        likes: likes,
+        dislikes: dislikes,
+      })
+      videosReturnApi.splice(index, 1, {
+        ...video,
+        likes: likes,
+        dislikes: dislikes,
+      })
+      setVideosReturnApi([...videosReturnApi])
+      return
+    }
+
+    if (alreadyDisliked) {
+      dislikes.splice(dislikes.indexOf(uid), 1)
+      if (action === 'like') {
+        likes.push(uid)
+      }
+      await FirebaseApi.db.collection('videos').doc(videoId).update({
+        likes: likes,
+        dislikes: dislikes,
+      })
+      videosReturnApi.splice(index, 1, {
+        ...video,
+        likes: likes,
+        dislikes: dislikes,
+      })
+      setVideosReturnApi([...videosReturnApi])
+      return
+    }
+
+    if (action === 'like') {
+      likes.push(uid)
+    } else {
+      dislikes.push(uid)
+    }
+    await FirebaseApi.db.collection('videos').doc(videoId).update({
+      likes: likes,
+      dislikes: dislikes,
+    })
+    videosReturnApi.splice(index, 1, {
+      ...video,
+      likes: likes,
+      dislikes: dislikes,
+    })
+    setVideosReturnApi([...videosReturnApi])
   }
 
   return (
@@ -275,9 +344,9 @@ const Main = () => {
           <GifLoading />
         ) : isSearch ? (
           dataSearch.length ? (
-            dataSearch.map((data) => {
+            dataSearch.map((data, index) => {
               return (
-                <C.BoxVideoAdd key={data.id}>
+                <C.BoxVideoAdd key={index}>
                   <C.Video src={data.thumbnailUrl} />
                   <C.ContainerInfos>
                     <C.ContainerTitleViews>
@@ -303,10 +372,10 @@ const Main = () => {
             <NotFound />
           )
         ) : videosReturnApi.length ? (
-          videosReturnApi.map((data) => {
+          videosReturnApi.map((data, index) => {
             return (
               <>
-                <C.BoxVideo key={data.videoId}>
+                <C.BoxVideo key={index}>
                   <C.RegisterBy>
                     <C.TextRegisterBy>
                       Adicionado por: {data.addedBy}
@@ -327,11 +396,31 @@ const Main = () => {
                     </C.ContainerTitleViews>
                     <C.ContainerLikes>
                       <C.CountLikes>{data.likes.length}</C.CountLikes>
-                      <C.Like>
-                        <AiFillLike size={35} color="#2EB086" />
+                      <C.Like
+                        onClick={() =>
+                          handleLikeAndDislike(data.videoId, UUID || '', 'like')
+                        }
+                      >
+                        {data.likes.find((like) => like === UUID) ? (
+                          <AiFillLike size={35} color="#2EB086" />
+                        ) : (
+                          <AiOutlineLike size={35} color="#fff" />
+                        )}
                       </C.Like>
-                      <C.Dislike>
-                        <AiOutlineDislike size={35} color="#fff" />
+                      <C.Dislike
+                        onClick={() =>
+                          handleLikeAndDislike(
+                            data.videoId,
+                            UUID || '',
+                            'dislike',
+                          )
+                        }
+                      >
+                        {data.dislikes.find((dislike) => dislike === UUID) ? (
+                          <AiFillDislike size={35} color="#E82929" />
+                        ) : (
+                          <AiOutlineDislike size={35} color="#fff" />
+                        )}
                       </C.Dislike>
                     </C.ContainerLikes>
                   </C.ContainerInfos>
